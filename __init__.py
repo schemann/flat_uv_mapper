@@ -86,6 +86,11 @@ def project_faces(obj, settings):
             final_u = ru / tile_x + off_x
             final_v = rv / tile_y + off_y
 
+            if settings.flip_u:
+                final_u = -final_u
+            if settings.flip_v:
+                final_v = -final_v
+
             loop[uv_layer].uv = (final_u, final_v)
 
     bmesh.update_edit_mesh(me)
@@ -207,6 +212,8 @@ def read_from_face(obj, settings):
     settings.rotation = math.degrees(rot)
     settings.offset_x = off_x % 1.0
     settings.offset_y = off_y % 1.0
+    settings.flip_u = False
+    settings.flip_v = False
     return True
 # ---------------------------------------------------------------------------
 
@@ -243,6 +250,12 @@ class FlatUVSettings(bpy.types.PropertyGroup):
     rotation: bpy.props.FloatProperty(
         name="Rotation", default=0.0, soft_min=-360.0, soft_max=360.0,
         subtype='ANGLE' if False else 'NONE', unit='NONE',
+        update=_live_update)
+    flip_u: bpy.props.BoolProperty(
+        name="Flip U", default=False,
+        update=_live_update)
+    flip_v: bpy.props.BoolProperty(
+        name="Flip V", default=False,
         update=_live_update)
     live_apply: bpy.props.BoolProperty(
         name="Live Apply", default=True,
@@ -286,6 +299,8 @@ class FLATUV_OT_reset(bpy.types.Operator):
         s.rotation = 0.0
         s.tile_x = 1.0
         s.tile_y = 1.0
+        s.flip_u = False
+        s.flip_v = False
         return {'FINISHED'}
 
 
@@ -368,6 +383,12 @@ class FLATUV_PT_panel(bpy.types.Panel):
         row.prop(s, "offset_y", text="Y")
 
         layout.prop(s, "rotation", text="Rotation (deg)")
+
+        col = layout.column(align=True)
+        col.label(text="Flip:")
+        row = col.row(align=True)
+        row.prop(s, "flip_u", toggle=True)
+        row.prop(s, "flip_v", toggle=True)
 
         layout.separator()
         layout.prop(s, "live_apply")
