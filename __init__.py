@@ -263,6 +263,21 @@ class FlatUVSettings(bpy.types.PropertyGroup):
 
 
 # ---------------------------------------------------------------------------
+# Clipboard for Copy/Paste
+# ---------------------------------------------------------------------------
+_uv_clipboard = {
+    'mode': 'AXIS',
+    'tile_x': 1.0,
+    'tile_y': 1.0,
+    'offset_x': 0.0,
+    'offset_y': 0.0,
+    'rotation': 0.0,
+    'flip_u': False,
+    'flip_v': False,
+}
+
+
+# ---------------------------------------------------------------------------
 # Operators
 # ---------------------------------------------------------------------------
 
@@ -349,6 +364,69 @@ class FLATUV_OT_pick(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class FLATUV_OT_copy(bpy.types.Operator):
+    bl_idname = "flatuv.copy"
+    bl_label = "Copy UVs"
+    bl_description = "Copy UV settings from the active face (or current settings)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        s = context.scene.flat_uv_settings
+        was_live = s.live_apply
+        s["live_apply"] = False
+        # Try to pick from face first
+        read_from_face(context.edit_object, s)
+        s["live_apply"] = was_live
+
+        _uv_clipboard['mode'] = s.mode
+        _uv_clipboard['tile_x'] = s.tile_x
+        _uv_clipboard['tile_y'] = s.tile_y
+        _uv_clipboard['offset_x'] = s.offset_x
+        _uv_clipboard['offset_y'] = s.offset_y
+        _uv_clipboard['rotation'] = s.rotation
+        _uv_clipboard['flip_u'] = s.flip_u
+        _uv_clipboard['flip_v'] = s.flip_v
+
+        self.report({'INFO'}, "Copied UV settings to clipboard")
+        return {'FINISHED'}
+
+
+class FLATUV_OT_paste(bpy.types.Operator):
+    bl_idname = "flatuv.paste"
+    bl_label = "Paste UVs"
+    bl_description = "Paste copied UV settings to selected faces"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        s = context.scene.flat_uv_settings
+        was_live = s.live_apply
+        s["live_apply"] = False
+
+        s.mode = _uv_clipboard['mode']
+        s.tile_x = _uv_clipboard['tile_x']
+        s.tile_y = _uv_clipboard['tile_y']
+        s.offset_x = _uv_clipboard['offset_x']
+        s.offset_y = _uv_clipboard['offset_y']
+        s.rotation = _uv_clipboard['rotation']
+        s.flip_u = _uv_clipboard['flip_u']
+        s.flip_v = _uv_clipboard['flip_v']
+
+        s["live_apply"] = was_live
+
+        # Apply immediately
+        n = project_faces(context.edit_object, s)
+        self.report({'INFO'}, f"Pasted UV settings to {n} face(s)")
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
@@ -399,6 +477,11 @@ class FLATUV_PT_panel(bpy.types.Panel):
         row = layout.row(align=True)
         row.operator("flatuv.fit", icon='FULLSCREEN_ENTER')
         row.operator("flatuv.pick", icon='EYEDROPPER')
+
+        row = layout.row(align=True)
+        row.operator("flatuv.copy", icon='COPYDOWN')
+        row.operator("flatuv.paste", icon='PASTEDOWN')
+        
         layout.operator("flatuv.reset", icon='LOOP_BACK')
 
 
@@ -411,6 +494,8 @@ classes = (
     FLATUV_OT_apply,
     FLATUV_OT_fit,
     FLATUV_OT_pick,
+    FLATUV_OT_copy,
+    FLATUV_OT_paste,
     FLATUV_OT_reset,
     FLATUV_PT_panel,
 )
