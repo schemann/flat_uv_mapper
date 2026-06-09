@@ -1,6 +1,7 @@
 import bpy
 import bmesh
 import math
+import random
 from mathutils import Vector, Matrix
 
 
@@ -603,6 +604,76 @@ class FLATUV_OT_align_edge(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class FLATUV_OT_randomize(bpy.types.Operator):
+    bl_idname = "flatuv.randomize"
+    bl_label = "Randomize UVs"
+    bl_description = "Apply random offset (and optionally 90-degree rotation) to selected faces"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    random_offset: bpy.props.BoolProperty(name="Random Offset", default=True)
+    random_rotation: bpy.props.BoolProperty(name="Random 90° Rotation", default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.edit_object
+        me = obj.data
+        bm = bmesh.from_edit_mesh(me)
+
+        uv_layer = bm.loops.layers.uv.active
+        if uv_layer is None:
+            return {'CANCELLED'}
+
+        sel_faces = [f for f in bm.faces if f.select]
+        if not sel_faces:
+            return {'CANCELLED'}
+
+        s = context.scene.flat_uv_settings
+        
+        # Turn off live apply to preserve randomization
+        s.live_apply = False
+
+        mw = obj.matrix_world
+        nmat = mw.to_3x3().inverted_safe().transposed()
+
+        for f in sel_faces:
+            world_n = (nmat @ f.normal).normalized()
+            u_axis, v_axis = _basis_for_face(world_n, s.mode)
+
+            off_x = random.random() if self.random_offset else s.offset_x
+            off_y = random.random() if self.random_offset else s.offset_y
+
+            if self.random_rotation:
+                rot = math.radians(s.rotation + random.choice([0, 90, 180, 270]))
+            else:
+                rot = math.radians(s.rotation)
+                
+            cos_r = math.cos(rot)
+            sin_r = math.sin(rot)
+
+            for loop in f.loops:
+                wc = mw @ loop.vert.co
+                u = wc.dot(u_axis)
+                v = wc.dot(v_axis)
+
+                ru = u * cos_r - v * sin_r
+                rv = u * sin_r + v * cos_r
+
+                final_u = ru / s.tile_x + off_x
+                final_v = rv / s.tile_y + off_y
+
+                if s.flip_u: final_u = -final_u
+                if s.flip_v: final_v = -final_v
+
+                loop[uv_layer].uv = (final_u, final_v)
+
+        bmesh.update_edit_mesh(me)
+        self.report({'INFO'}, f"Randomized {len(sel_faces)} face(s)")
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
@@ -665,6 +736,8 @@ class FLATUV_PT_panel(bpy.types.Panel):
         row = layout.row(align=True)
         row.scale_y = 1.3
         row.operator("flatuv.apply", icon='UV')
+        
+        layout.operator("flatuv.randomize", icon='PIVOT_CURSOR')
 
         row = layout.row(align=True)
         row.operator("flatuv.fit", icon='FULLSCREEN_ENTER')
@@ -691,6 +764,7 @@ classes = (
     FLATUV_OT_aspect,
     FLATUV_OT_justify,
     FLATUV_OT_align_edge,
+    FLATUV_OT_randomize,
     FLATUV_OT_reset,
     FLATUV_PT_panel,
 )
