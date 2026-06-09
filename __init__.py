@@ -427,6 +427,45 @@ class FLATUV_OT_paste(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class FLATUV_OT_aspect(bpy.types.Operator):
+    bl_idname = "flatuv.aspect"
+    bl_label = "Aspect Ratio"
+    bl_description = "Adjust Tile Y to match the aspect ratio of the active material's texture"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.edit_object
+        if not obj.active_material or not obj.active_material.node_tree:
+            self.report({'WARNING'}, "No active material with nodes found")
+            return {'CANCELLED'}
+
+        img_node = None
+        for node in obj.active_material.node_tree.nodes:
+            if node.type == 'TEX_IMAGE' and node.image:
+                img_node = node
+                break
+
+        if not img_node:
+            self.report({'WARNING'}, "No Image Texture node found in the active material")
+            return {'CANCELLED'}
+
+        width, height = img_node.image.size
+        if width == 0 or height == 0:
+            self.report({'WARNING'}, "Image has invalid size")
+            return {'CANCELLED'}
+
+        s = context.scene.flat_uv_settings
+        ratio = width / height
+        s.tile_y = s.tile_x / ratio
+
+        self.report({'INFO'}, f"Adjusted Aspect Ratio ({width}x{height})")
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
@@ -453,6 +492,8 @@ class FLATUV_PT_panel(bpy.types.Panel):
         row = col.row(align=True)
         row.prop(s, "tile_x", text="X")
         row.prop(s, "tile_y", text="Y")
+        
+        layout.operator("flatuv.aspect", icon='IMAGE_DATA')
 
         col = layout.column(align=True)
         col.label(text="Offset:")
@@ -496,6 +537,7 @@ classes = (
     FLATUV_OT_pick,
     FLATUV_OT_copy,
     FLATUV_OT_paste,
+    FLATUV_OT_aspect,
     FLATUV_OT_reset,
     FLATUV_PT_panel,
 )
