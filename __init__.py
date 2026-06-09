@@ -751,6 +751,35 @@ class FLATUV_PT_panel(bpy.types.Panel):
 
 
 # ---------------------------------------------------------------------------
+# Pie Menu
+# ---------------------------------------------------------------------------
+
+class FLATUV_MT_pie_menu(bpy.types.Menu):
+    bl_idname = "FLATUV_MT_pie_menu"
+    bl_label = "Flat UV Mapper"
+
+    def draw(self, context):
+        layout = self.layout
+        pie = layout.menu_pie()
+
+        # Left (W)
+        pie.operator("flatuv.copy", icon='COPYDOWN')
+        # Right (E)
+        pie.operator("flatuv.paste", icon='PASTEDOWN')
+        # Bottom (S)
+        pie.operator("flatuv.pick", icon='EYEDROPPER')
+        # Top (N)
+        pie.operator("flatuv.apply", icon='UV')
+        # Top-Left (NW)
+        pie.operator("flatuv.aspect", icon='IMAGE_DATA')
+        # Top-Right (NE)
+        pie.operator("flatuv.fit", icon='FULLSCREEN_ENTER')
+        # Bottom-Left (SW)
+        pie.operator("flatuv.align_edge", icon='EDGESEL')
+        # Bottom-Right (SE)
+        pie.operator("flatuv.randomize", icon='PIVOT_CURSOR')
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
@@ -767,16 +796,30 @@ classes = (
     FLATUV_OT_randomize,
     FLATUV_OT_reset,
     FLATUV_PT_panel,
+    FLATUV_MT_pie_menu,
 )
 
+addon_keymaps = []
 
 def register():
     for c in classes:
         bpy.utils.register_class(c)
     bpy.types.Scene.flat_uv_settings = bpy.props.PointerProperty(type=FlatUVSettings)
 
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name='Mesh', space_type='EMPTY')
+        kmi = km.keymap_items.new('wm.call_menu_pie', 'U', 'PRESS', shift=True, alt=True)
+        kmi.properties.name = "FLATUV_MT_pie_menu"
+        addon_keymaps.append((km, kmi))
+
 
 def unregister():
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+
     del bpy.types.Scene.flat_uv_settings
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
