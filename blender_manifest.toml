@@ -1,0 +1,17 @@
+schema_version = "1.0.0"
+
+id = "flat_uv_mapper"
+version = "1.0.0"
+name = "Flat UV Mapper"
+tagline = "CSG-style planar face UV mapping with tile, offset and rotation"
+maintainer = "Daniel Schemann"
+type = "add-on"
+
+tags = ["UV", "Mesh"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+website = "https://github.com/schemann/flat_uv_mapper"
+copyright = ["2026 Daniel Schemann"]
