@@ -466,6 +466,87 @@ class FLATUV_OT_aspect(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class FLATUV_OT_justify(bpy.types.Operator):
+    bl_idname = "flatuv.justify"
+    bl_label = "Justify UVs"
+    bl_description = "Align UV bounds to boundaries (Top, Bottom, Left, Right, Center)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    align: bpy.props.EnumProperty(
+        items=[
+            ('TOP', "Top", "Align to top edge"),
+            ('BOTTOM', "Bottom", "Align to bottom edge"),
+            ('LEFT', "Left", "Align to left edge"),
+            ('RIGHT', "Right", "Align to right edge"),
+            ('CENTER', "Center", "Center UVs"),
+            ('FIT_X', "Fit X", "Fit horizontally"),
+            ('FIT_Y', "Fit Y", "Fit vertically"),
+        ]
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.edit_object
+        me = obj.data
+        bm = bmesh.from_edit_mesh(me)
+        sel_faces = [f for f in bm.faces if f.select]
+        if not sel_faces:
+            return {'CANCELLED'}
+
+        s = context.scene.flat_uv_settings
+        mw = obj.matrix_world
+        nmat = mw.to_3x3().inverted_safe().transposed()
+        rot = math.radians(s.rotation)
+        cos_r, sin_r = math.cos(rot), math.sin(rot)
+
+        min_ru = min_rv = float('inf')
+        max_ru = max_rv = float('-inf')
+
+        for f in sel_faces:
+            world_n = (nmat @ f.normal).normalized()
+            u_axis, v_axis = _basis_for_face(world_n, s.mode)
+            for loop in f.loops:
+                wc = mw @ loop.vert.co
+                u = wc.dot(u_axis)
+                v = wc.dot(v_axis)
+                ru = u * cos_r - v * sin_r
+                rv = u * sin_r + v * cos_r
+                min_ru, max_ru = min(min_ru, ru), max(max_ru, ru)
+                min_rv, max_rv = min(min_rv, rv), max(max_rv, rv)
+
+        span_ru = max(max_ru - min_ru, 1e-9)
+        span_rv = max(max_rv - min_rv, 1e-9)
+
+        was_live = s.live_apply
+        s["live_apply"] = False
+
+        if self.align == 'LEFT':
+            s.offset_x = -min_ru / s.tile_x
+        elif self.align == 'RIGHT':
+            s.offset_x = 1.0 - max_ru / s.tile_x
+        elif self.align == 'BOTTOM':
+            s.offset_y = -min_rv / s.tile_y
+        elif self.align == 'TOP':
+            s.offset_y = 1.0 - max_rv / s.tile_y
+        elif self.align == 'CENTER':
+            s.offset_x = 0.5 - (max_ru + min_ru) / (2.0 * s.tile_x)
+            s.offset_y = 0.5 - (max_rv + min_rv) / (2.0 * s.tile_y)
+        elif self.align == 'FIT_X':
+            s.tile_x = span_ru
+            s.offset_x = -min_ru / s.tile_x
+        elif self.align == 'FIT_Y':
+            s.tile_y = span_rv
+            s.offset_y = -min_rv / s.tile_y
+
+        s["live_apply"] = was_live
+        project_faces(obj, s)
+
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
@@ -504,6 +585,18 @@ class FLATUV_PT_panel(bpy.types.Panel):
         layout.prop(s, "rotation", text="Rotation (deg)")
 
         col = layout.column(align=True)
+        col.label(text="Justify:")
+        row = col.row(align=True)
+        row.operator("flatuv.justify", text="L").align = 'LEFT'
+        row.operator("flatuv.justify", text="C").align = 'CENTER'
+        row.operator("flatuv.justify", text="R").align = 'RIGHT'
+        row.operator("flatuv.justify", text="T").align = 'TOP'
+        row.operator("flatuv.justify", text="B").align = 'BOTTOM'
+        row = col.row(align=True)
+        row.operator("flatuv.justify", text="Fit X").align = 'FIT_X'
+        row.operator("flatuv.justify", text="Fit Y").align = 'FIT_Y'
+
+        col = layout.column(align=True)
         col.label(text="Flip:")
         row = col.row(align=True)
         row.prop(s, "flip_u", toggle=True)
@@ -538,6 +631,7 @@ classes = (
     FLATUV_OT_copy,
     FLATUV_OT_paste,
     FLATUV_OT_aspect,
+    FLATUV_OT_justify,
     FLATUV_OT_reset,
     FLATUV_PT_panel,
 )
