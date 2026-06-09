@@ -31,8 +31,23 @@ def main():
 
     major, minor, patch = int(match.group(1)), int(match.group(2)), int(match.group(3))
     
-    # Increment the patch version (e.g. 1.0.0 -> 1.0.1)
-    patch += 1
+    bump_type = "patch"
+    if len(sys.argv) > 1:
+        bump_type = sys.argv[1].lower()
+
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    elif bump_type == "patch":
+        patch += 1
+    else:
+        print(f"Error: Unknown bump type '{bump_type}'. Use 'major', 'minor', or 'patch'.")
+        sys.exit(1)
+
     new_version = f"{major}.{minor}.{patch}"
 
     # Update manifest
