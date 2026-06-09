@@ -1,6 +1,6 @@
 # Flat UV Mapper
 
-<img src="featured.png" width="100%">
+<img src="images/featured.png" width="100%">
 
 **Flat UV Mapper** is a Blender add-on that brings a rapid, CSG-style (e.g., Source Engine / Hammer Editor) planar face UV mapping workflow directly into Blender. It allows you to quickly apply, scale, align, and manipulate planar UV maps on selected faces without ever needing to open the UV Editor.
 
