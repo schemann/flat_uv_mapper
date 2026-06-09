@@ -547,6 +547,62 @@ class FLATUV_OT_justify(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class FLATUV_OT_align_edge(bpy.types.Operator):
+    bl_idname = "flatuv.align_edge"
+    bl_label = "Align Rotation to Edge"
+    bl_description = "Align UV rotation to the selected edge"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        obj = context.edit_object
+        me = obj.data
+        bm = bmesh.from_edit_mesh(me)
+
+        edges = [e for e in bm.edges if e.select]
+        if not edges:
+            self.report({'WARNING'}, "No edge selected")
+            return {'CANCELLED'}
+
+        e = edges[0]
+        s = context.scene.flat_uv_settings
+        mw = obj.matrix_world
+        nmat = mw.to_3x3().inverted_safe().transposed()
+
+        faces = [f for f in e.link_faces if f.select]
+        if not faces:
+            faces = e.link_faces
+        if not faces:
+            return {'CANCELLED'}
+        f = faces[0]
+
+        world_n = (nmat @ f.normal).normalized()
+        u_axis, v_axis = _basis_for_face(world_n, s.mode)
+
+        wc1 = mw @ e.verts[0].co
+        wc2 = mw @ e.verts[1].co
+        vec = (wc2 - wc1).normalized()
+
+        du = vec.dot(u_axis)
+        dv = vec.dot(v_axis)
+
+        angle = math.atan2(dv, du)
+
+        was_live = s.live_apply
+        s["live_apply"] = False
+
+        s.rotation = math.degrees(angle)
+
+        s["live_apply"] = was_live
+        project_faces(obj, s)
+
+        self.report({'INFO'}, "Aligned rotation to edge")
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
@@ -582,7 +638,9 @@ class FLATUV_PT_panel(bpy.types.Panel):
         row.prop(s, "offset_x", text="X")
         row.prop(s, "offset_y", text="Y")
 
-        layout.prop(s, "rotation", text="Rotation (deg)")
+        row = layout.row(align=True)
+        row.prop(s, "rotation", text="Rotation (deg)")
+        row.operator("flatuv.align_edge", text="", icon='EDGESEL')
 
         col = layout.column(align=True)
         col.label(text="Justify:")
@@ -632,6 +690,7 @@ classes = (
     FLATUV_OT_paste,
     FLATUV_OT_aspect,
     FLATUV_OT_justify,
+    FLATUV_OT_align_edge,
     FLATUV_OT_reset,
     FLATUV_PT_panel,
 )
