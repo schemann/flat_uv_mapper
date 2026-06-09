@@ -7,7 +7,7 @@ tagline = "CSG-style planar face UV mapping with tile, offset and rotation"
 maintainer = "Daniel Schemann"
 type = "add-on"
 
-tags = ["UV", "Mesh"]
+tags = ["UV"]
 
 blender_version_min = "4.2.0"
 
