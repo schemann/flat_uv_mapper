@@ -24,7 +24,7 @@ def main():
     with open(manifest_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    match = re.search(r'version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', content)
+    match = re.search(r'^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', content, re.MULTILINE)
     if not match:
         print("Could not find the version in blender_manifest.toml.")
         sys.exit(1)
@@ -52,9 +52,10 @@ def main():
 
     # Update manifest
     new_content = re.sub(
-        r'(version\s*=\s*")\d+\.\d+\.\d+(")',
-        rf'\g<1>{new_version}\g<2>',
-        content
+        r'^version\s*=\s*"\d+\.\d+\.\d+"',
+        f'version = "{new_version}"',
+        content,
+        flags=re.MULTILINE
     )
 
     with open(manifest_path, "w", encoding="utf-8") as f:
